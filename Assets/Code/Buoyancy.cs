@@ -15,7 +15,19 @@ public class Buoyancy : MonoBehaviour
 	public static event Action<GameObject> OnDestroyed;
 
 	Vector3 worldVertPos;
+	
+	//my variables and hopeful fixes
+	private Rigidbody rb;
+	private Vector3[] meshNormals;
+	private Vector3[] meshVertices;
 
+	private void Start()
+	{
+		rb = GetComponent<Rigidbody>();
+		meshNormals = GetComponent<MeshFilter>().mesh.normals;
+		meshVertices = GetComponent<MeshFilter>().mesh.vertices;
+		
+	}
 
 	void FixedUpdate()
 	{
@@ -26,25 +38,15 @@ public class Buoyancy : MonoBehaviour
 	{
 		underwaterVerts = 0;
 
-		for (var index = 0; index < GetComponent<MeshFilter>().mesh.normals.Length; index++)
+		for (var index = 0; index < meshNormals.Length; index++)
 		{
-			worldVertPos = transform.position + transform.TransformDirection(GetComponent<MeshFilter>().mesh.vertices[index]);
+			worldVertPos = transform.position + transform.TransformDirection(meshVertices[index]);
 			if (worldVertPos.y < waterLineHack)
 			{
-				// Splashes only on surface of water plane
-				if (worldVertPos.y > waterLineHack - 0.1f)
-				{
-					if (GetComponent<Rigidbody>().velocity.magnitude > splashVelocityThreshold || GetComponent<Rigidbody>().angularVelocity.magnitude > splashVelocityThreshold)
-					{
-						if (OnSplash != null)
-						{
-							OnSplash.Invoke(gameObject, worldVertPos, GetComponent<Rigidbody>().velocity);
-						}
-					}
-				}
-				Vector3	forceAmount = (transform.TransformDirection(-GetComponent<MeshFilter>().mesh.normals[index]) * forceScalar) * Time.deltaTime;
-				Vector3 forcePosition = transform.position + transform.TransformDirection(GetComponent<MeshFilter>().mesh.vertices[index]);
-				GetComponent<Rigidbody>().AddForceAtPosition(forceAmount, forcePosition, ForceMode.Force);
+				
+				Vector3	forceAmount = (transform.TransformDirection(-meshNormals[index]) * forceScalar) * Time.deltaTime;
+				Vector3 forcePosition = transform.position + transform.TransformDirection(meshVertices[index]);
+				rb.AddForceAtPosition(forceAmount, forcePosition, ForceMode.Force);
 				underwaterVerts++;
 			}
 			// HACK to remove sunken boats
@@ -53,10 +55,23 @@ public class Buoyancy : MonoBehaviour
 				DestroyParentGO();
 				break;
 			}
-			// Drag for percentage underwater
-			GetComponent<Rigidbody>().drag = (underwaterVerts / (float)GetComponent<MeshFilter>().mesh.vertices.Length) * dragScalar;
-			GetComponent<Rigidbody>().angularDrag = (underwaterVerts / (float)GetComponent<MeshFilter>().mesh.vertices.Length) * dragScalar;
+			
 		}
+		
+		// Splashes only on surface of water plane
+		if (worldVertPos.y > waterLineHack - 0.1f)
+		{
+			if (rb.velocity.magnitude > splashVelocityThreshold || rb.angularVelocity.magnitude > splashVelocityThreshold)
+			{
+				if (OnSplash != null)
+				{
+					OnSplash.Invoke(gameObject, worldVertPos, rb.velocity);
+				}
+			}
+		}
+		// Drag for percentage underwater
+		rb.drag = (underwaterVerts / (float)meshVertices.Length) * dragScalar;
+		rb.angularDrag = (underwaterVerts / (float)meshVertices.Length) * dragScalar;
 	}
 
 	private void DestroyParentGO()
